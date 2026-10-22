@@ -24,12 +24,12 @@ your use case.
 ## Installation
 
 ```bash
-pip install "extraceval[all]"        # every supported tool
-pip install "extraceval[pymupdf,pdfplumber]"   # or pick the tools you need
+pip install extraceval
 ```
 
-The core install includes `pypdfium2`, so there is always at least one tool to run. Tools that
-are not installed are skipped. Note that PyMuPDF is AGPL-licensed.
+This installs all supported tools: pypdfium2, pypdf, PyMuPDF, pymupdf4llm, pdfplumber,
+pdfminer.six and Docling. Docling pulls in PyTorch and downloads its models on first use. Note
+that PyMuPDF and pymupdf4llm are AGPL-licensed.
 
 ## Usage
 
@@ -85,6 +85,7 @@ runs/<name>/
   sample/<document>.pdf                copies of the sampled PDFs
   outputs/<extractor>/<document>.txt   extracted text, pages separated by form feeds (\f)
   results.jsonl                        status, seconds, pages and characters per document and tool
+  tools.log                            warnings and other output from the tools, by tool and document
 ```
 
 ### Comparing outputs
