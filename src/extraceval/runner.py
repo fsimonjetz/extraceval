@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from extraceval import corpus
+from extraceval.capture import capture
 from extraceval.config import Config, ExtractorSpec, load_config
 from extraceval.extractors import Extractor
 from extraceval.models import Document, ExtractionResult
@@ -23,6 +24,8 @@ log = logging.getLogger(__name__)
 class RunResult:
     path: Path
     results: list[ExtractionResult]
+    tool_log: Path | None = None
+    """Messages the tools printed or logged during the run, if any."""
 
 
 class Runner:
@@ -56,37 +59,41 @@ class Runner:
         setup_seconds: dict[str, float] = {}
         self.directory.write_manifest(self._manifest(setup_seconds, earlier))
 
-        for spec in self.extractors:
-            todo: list[Document] = []
-            for doc in documents:
-                done = previous.get((doc.id, spec.name))
-                if done and done.status == "ok" and not self.force:
-                    if on_result:
-                        on_result(done)
-                else:
-                    todo.append(doc)
-            if not todo:
-                continue
+        with capture(self.directory.log_path) as tool_log:
+            for spec in self.extractors:
+                todo: list[Document] = []
+                for doc in documents:
+                    done = previous.get((doc.id, spec.name))
+                    if done and done.status == "ok" and not self.force:
+                        if on_result:
+                            on_result(done)
+                    else:
+                        todo.append(doc)
+                if not todo:
+                    continue
 
-            extractor = spec.build()
-            start = time.perf_counter()
-            try:
-                extractor.setup()
-            except Exception as exc:
-                log.exception("setup of %r failed", spec.name)
+                extractor = spec.build()
+                start = time.perf_counter()
+                try:
+                    with tool_log.section(f"{spec.name}: setup"):
+                        extractor.setup()
+                except Exception as exc:
+                    log.exception("setup of %r failed", spec.name)
+                    for doc in todo:
+                        error = _error(doc, spec, 0.0, f"setup failed: {exc!r}")
+                        self._record(error, previous, on_result)
+                    continue
+                try:
+                    with tool_log.section(f"{spec.name}: warm-up"):
+                        extractor.warm_up()
+                except Exception:
+                    log.warning("warm-up of %r failed; continuing without it", spec.name)
+                setup_seconds[spec.name] = time.perf_counter() - start
+
                 for doc in todo:
-                    self._record(
-                        _error(doc, spec, 0.0, f"setup failed: {exc!r}"), previous, on_result
-                    )
-                continue
-            try:
-                extractor.warm_up()
-            except Exception:
-                log.warning("warm-up of %r failed; continuing without it", spec.name, exc_info=True)
-            setup_seconds[spec.name] = time.perf_counter() - start
-
-            for doc in todo:
-                self._record(self._extract(extractor, spec, doc), previous, on_result)
+                    with tool_log.section(f"{spec.name}: {doc.id}"):
+                        result = self._extract(extractor, spec, doc)
+                    self._record(result, previous, on_result)
 
         self.directory.write_manifest(self._manifest(setup_seconds, earlier))
         results = [
@@ -96,7 +103,11 @@ class Runner:
             if (doc.id, spec.name) in previous
         ]
         self.directory.write_results(list(previous.values()))
-        return RunResult(path=self.directory.path, results=results)
+        return RunResult(
+            path=self.directory.path,
+            results=results,
+            tool_log=None if tool_log.empty else tool_log.path,
+        )
 
     def _extract(
         self, extractor: Extractor[Any], spec: ExtractorSpec, doc: Document

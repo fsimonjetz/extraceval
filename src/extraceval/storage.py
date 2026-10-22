@@ -5,6 +5,7 @@
   sample/<document>.pdf            copies of the sampled inputs
   outputs/<extractor>/<document>.txt   extracted text, pages separated by form feeds
   results.jsonl                    one ExtractionResult per (document, extractor)
+  tools.log                        what the tools printed or logged, by tool and document
 """
 
 import json
@@ -24,6 +25,7 @@ class RunDirectory:
         self.path = path
         self.manifest_path = path / "manifest.json"
         self.results_path = path / "results.jsonl"
+        self.log_path = path / "tools.log"
         self.sample_dir = path / "sample"
         self.outputs_dir = path / "outputs"
 
