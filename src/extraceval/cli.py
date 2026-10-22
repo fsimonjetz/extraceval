@@ -1,4 +1,5 @@
 import logging
+import sys
 import webbrowser
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -21,12 +22,20 @@ console = Console()
 
 
 @app.callback()
-def main(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.WARNING,
-        format="%(message)s",
-        handlers=[RichHandler(console=console, show_path=False)],
-    )
+def main(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Also show the tools' own log messages.")
+    ] = False,
+) -> None:
+    # Pin the console to the current stdout; during extraction, sys.stdout points at the tool log.
+    console.file = sys.stdout
+    # By default only extraceval's own messages reach the terminal; the tools' go to tools.log.
+    logger = logging.getLogger() if verbose else logging.getLogger("extraceval")
+    for existing in (logging.getLogger(), logging.getLogger("extraceval")):
+        for handler in [h for h in existing.handlers if isinstance(h, RichHandler)]:
+            existing.removeHandler(handler)
+    logger.addHandler(RichHandler(console=console, show_path=False))
+    logger.setLevel(logging.DEBUG if verbose else logging.WARNING)
 
 
 @app.command()
@@ -72,6 +81,8 @@ def run(
 
     console.print(_summary_table(summarize(result.path, [s.name for s in runner.extractors])))
     console.print(f"Outputs written to [bold]{result.path}[/]")
+    if result.tool_log:
+        console.print(f"[dim]Messages from the tools are in {result.tool_log}[/]")
 
 
 @app.command("summary")
@@ -156,13 +167,17 @@ def _matrix_table(matrix: SimilarityMatrix) -> Table:
         colour = "green" if position > 2 / 3 else "yellow" if position > 1 / 3 else "red"
         return f"[{colour}]{value:.0%}[/]"
 
-    table = Table("", *matrix.extractors, "mean", title="Similarity of extracted text")
-    for row in matrix.extractors:
-        cells = [
-            "[dim]-[/]" if row == column else cell(matrix[row, column])
-            for column in matrix.extractors
-        ]
-        table.add_row(row, *cells, f"[bold]{matrix.agreement(row):.0%}[/]")
+    # Columns are numbered so that the table stays narrow with many or long names.
+    names = matrix.extractors
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title="Similarity of extracted text")
+    table.add_column("extractor", no_wrap=True)
+    for number in range(1, len(names) + 1):
+        table.add_column(str(number), justify="right", no_wrap=True)
+    table.add_column("mean", justify="right", no_wrap=True)
+    for number, row in enumerate(names, start=1):
+        cells = ["[dim]-[/]" if row == column else cell(matrix[row, column]) for column in names]
+        label = f"[dim]{number}[/] {row}"
+        table.add_row(label, *cells, f"[bold]{matrix.agreement(row):.0%}[/]")
     return table
 
 
@@ -179,13 +194,22 @@ def _summary_table(summaries: list[ExtractorSummary]) -> Table:
             s.extractor,
             ok if not s.errors else f"[red]{ok}[/]",
             f"{s.pages:,}",
-            f"{s.pages_per_second:,.0f}" if s.pages_per_second else "-",
+            _rate(s.pages_per_second),
             _seconds(s.seconds_per_document),
             _seconds(s.seconds),
             _seconds(s.setup_seconds),
             f"{s.chars:,}",
         )
     return table
+
+
+def _rate(value: float | None) -> str:
+    """Whole numbers for fast tools, decimals for slow ones: 4,164 / 51 / 7.3 / 0.25."""
+    if value is None:
+        return "-"
+    if value >= 10:
+        return f"{value:,.0f}"
+    return f"{value:.1f}" if value >= 1 else f"{value:.2f}"
 
 
 def _seconds(value: float | None) -> str:
