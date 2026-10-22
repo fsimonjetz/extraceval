@@ -39,6 +39,11 @@ extraceval run pdfs/                 # all installed tools on all PDFs in pdfs/
 extraceval run pdfs/ -n 20 -e pypdf -e pymupdf --name trial
 ```
 
+After a run, a table shows each tool's success rate and speed in pages per second;
+`extraceval summary runs/<name>` shows it again later. Speed only counts the extraction itself:
+one-off costs such as imports and model loading are measured separately as setup time, which
+includes extracting a tiny bundled warm-up page with each tool.
+
 Re-using a run name resumes it: document/tool pairs that already succeeded are skipped (use
 `--force` to redo them). The same is available from Python:
 
