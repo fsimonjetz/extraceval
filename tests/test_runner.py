@@ -16,9 +16,13 @@ class FakeOptions(ExtractorOptions):
 class Fake(Extractor[FakeOptions]):
     distribution = "pytest"
     calls = 0
+    warm_ups = 0
 
     def extract(self, path: Path) -> list[str]:
-        type(self).calls += 1
+        if path.name == "warmup.pdf":
+            type(self).warm_ups += 1
+        else:
+            type(self).calls += 1
         if self.options.fail_on and self.options.fail_on in path.name:
             raise RuntimeError("boom")
         return [f"{path.stem} page 1", f"{path.stem} page 2"]
@@ -30,6 +34,12 @@ class BrokenSetup(Fake):
         raise RuntimeError("no model")
 
 
+@register("fake-broken-warm-up")
+class BrokenWarmUp(Fake):
+    def warm_up(self) -> None:
+        raise RuntimeError("cannot read the warm-up page")
+
+
 @register("fake-missing")
 class Missing(Fake):
     distribution = "surely-not-installed-xyz"
@@ -37,7 +47,7 @@ class Missing(Fake):
 
 @pytest.fixture(autouse=True)
 def reset_calls() -> None:
-    Fake.calls = 0
+    Fake.calls = Fake.warm_ups = 0
 
 
 def make_config(pdf_dir: Path, tmp_path: Path, **kwargs: object) -> Config:
@@ -117,3 +127,18 @@ def test_run_function_with_overrides(pdf_dir: Path, tmp_path: Path) -> None:
     )
     assert result.path == tmp_path / "out" / "api"
     assert len(result.results) == 2
+
+
+def test_warm_up_runs_once_before_timing(pdf_dir: Path, tmp_path: Path) -> None:
+    Runner(make_config(pdf_dir, tmp_path, extractors=["fake"])).run()
+    assert (Fake.warm_ups, Fake.calls) == (1, 5)
+
+
+def test_failed_warm_up_does_not_stop_extraction(pdf_dir: Path, tmp_path: Path) -> None:
+    results = Runner(make_config(pdf_dir, tmp_path, extractors=["fake-broken-warm-up"])).run()
+    assert all(r.status == "ok" for r in results.results)
+
+
+def test_builtin_warm_up_reads_bundled_pdf() -> None:
+    extractor = extraceval.extractors.get("pypdfium2")()
+    extractor.warm_up()  # raises if the asset is missing from the package
