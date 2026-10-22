@@ -82,6 +82,23 @@ runs/<name>/
   results.jsonl                        status, seconds, pages and characters per document and tool
 ```
 
+### Comparing outputs
+
+```bash
+extraceval compare runs/<name>                   # similarity matrix of all tools
+extraceval compare runs/<name> pypdf pymupdf --open
+```
+
+Without tool names (or with three or more), `compare` prints how similar each pair of tools'
+outputs is, plus each tool's mean similarity to the others. A tool that disagrees with all the
+rest stands out at once. Similarity is measured on words, so line breaks and spacing don't count.
+
+With two tool names, it writes a self-contained HTML report to
+`runs/<name>/compare/pypdf-vs-pymupdf.html`. It lists the documents ordered by how much the two
+tools disagree, followed by a side-by-side diff of each page with changed words highlighted.
+Whitespace is normalised before diffing, and invisible characters such as soft hyphens are shown
+as markers.
+
 ### Adding a tool
 
 Subclass `Extractor` with an options model and register it, either at runtime with
