@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from importlib.metadata import PackageNotFoundError, version
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any, ClassVar, cast, get_args, get_origin
 
@@ -52,6 +53,15 @@ class Extractor[O: ExtractorOptions](ABC):
 
     def setup(self) -> None:  # noqa: B027 - optional hook, deliberately not abstract
         """One-time initialisation such as loading models. Timed separately from extraction."""
+
+    def warm_up(self) -> None:
+        """Extract a tiny bundled PDF once, after ``setup`` and before timing starts.
+
+        This moves one-off costs such as lazy imports, caches and model initialisation out of
+        the first document's timing, without each extractor having to handle them.
+        """
+        with as_file(files("extraceval") / "assets" / "warmup.pdf") as path:
+            self.extract(path)
 
     @abstractmethod
     def extract(self, path: Path) -> list[str]:

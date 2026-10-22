@@ -79,6 +79,10 @@ class Runner:
                         _error(doc, spec, 0.0, f"setup failed: {exc!r}"), previous, on_result
                     )
                 continue
+            try:
+                extractor.warm_up()
+            except Exception:
+                log.warning("warm-up of %r failed; continuing without it", spec.name, exc_info=True)
             setup_seconds[spec.name] = time.perf_counter() - start
 
             for doc in todo:
