@@ -5,6 +5,7 @@ from extraceval.config import Config, ConfigError, ExtractorSpec, load_config
 from extraceval.extractors import Extractor, ExtractorOptions, register
 from extraceval.models import Document, ExtractionResult
 from extraceval.runner import Runner, RunResult, run
+from extraceval.summary import ExtractorSummary, summarize
 
 __all__ = [
     "Config",
@@ -14,10 +15,12 @@ __all__ = [
     "Extractor",
     "ExtractorOptions",
     "ExtractorSpec",
+    "ExtractorSummary",
     "RunResult",
     "Runner",
     "compare",
     "load_config",
     "register",
     "run",
+    "summarize",
 ]

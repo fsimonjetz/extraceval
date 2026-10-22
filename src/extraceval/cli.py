@@ -1,10 +1,10 @@
 import logging
 import webbrowser
-from collections import defaultdict
 from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
@@ -13,8 +13,8 @@ from rich.table import Table
 from extraceval import extractors
 from extraceval.compare import SimilarityMatrix, compare, similarity_matrix
 from extraceval.config import ConfigError, load_config
-from extraceval.models import ExtractionResult
 from extraceval.runner import Runner
+from extraceval.summary import ExtractorSummary, summarize
 
 app = typer.Typer(no_args_is_help=True, help="Compare PDF-to-text tools on your own documents.")
 console = Console()
@@ -70,8 +70,19 @@ def run(
         task = progress.add_task("Extracting", total=runner.total)
         result = runner.run(on_result=lambda _: progress.advance(task))
 
-    console.print(_summary(result.results))
+    console.print(_summary_table(summarize(result.path, [s.name for s in runner.extractors])))
     console.print(f"Outputs written to [bold]{result.path}[/]")
+
+
+@app.command("summary")
+def show_summary(
+    run: Annotated[Path, typer.Argument(help="Run directory, e.g. runs/my-run.")],
+) -> None:
+    """Show speed and success per extractor for an existing run."""
+    summaries = summarize(run)
+    if not summaries:
+        _fail(f"no results in {run}")
+    console.print(_summary_table(summaries))
 
 
 @app.command("compare")
@@ -155,26 +166,31 @@ def _matrix_table(matrix: SimilarityMatrix) -> Table:
     return table
 
 
-def _summary(results: list[ExtractionResult]) -> Table:
-    by_extractor: dict[str, list[ExtractionResult]] = defaultdict(list)
-    for result in results:
-        by_extractor[result.extractor].append(result)
-
-    table = Table("extractor")
-    for column in ("ok", "errors", "pages", "total s", "s / doc", "ms / page", "chars"):
-        table.add_column(column, justify="right")
-    for name, rows in by_extractor.items():
-        ok = [r for r in rows if r.status == "ok"]
-        seconds = sum(r.seconds for r in ok)
-        pages = sum(r.pages for r in ok)
+def _summary_table(summaries: list[ExtractorSummary]) -> Table:
+    """Speed per extractor; ``ok`` shows successful of all documents, e.g. ``4/5``."""
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False)
+    width = max(len(s.extractor) for s in summaries)
+    table.add_column("extractor", no_wrap=True, min_width=width)
+    for column in ("ok", "pages", "pages/s", "s/doc", "total s", "setup s", "chars"):
+        table.add_column(column, justify="right", no_wrap=True)
+    for s in summaries:
+        ok = f"{s.ok}/{s.ok + s.errors}"
         table.add_row(
-            name,
-            str(len(ok)),
-            str(len(rows) - len(ok)),
-            f"{pages:,}",
-            f"{seconds:.2f}",
-            f"{seconds / len(ok):.3f}" if ok else "-",
-            f"{1000 * seconds / pages:.1f}" if pages else "-",
-            f"{sum(r.chars for r in ok):,}",
+            s.extractor,
+            ok if not s.errors else f"[red]{ok}[/]",
+            f"{s.pages:,}",
+            f"{s.pages_per_second:,.0f}" if s.pages_per_second else "-",
+            _seconds(s.seconds_per_document),
+            _seconds(s.seconds),
+            _seconds(s.setup_seconds),
+            f"{s.chars:,}",
         )
     return table
+
+
+def _seconds(value: float | None) -> str:
+    if value is None:
+        return "-"
+    if value >= 100:
+        return f"{value:,.0f}"
+    return f"{value:.2f}" if value >= 0.01 else "<0.01"
