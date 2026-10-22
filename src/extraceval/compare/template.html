@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --border: #d1d9e0; --panel: #f6f8fa;
+    --left-bg: #fff5e0; --left-mark: #ffd98a; --right-bg: #e6f0ff; --right-mark: #a8c8ff;
+    --empty: repeating-linear-gradient(-45deg, transparent 0 4px, #eaeef2 4px 5px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --border: #3d444d; --panel: #151b23;
+      --left-bg: #3a2a0c; --left-mark: #7a5512; --right-bg: #0f2547; --right-mark: #1f4f99;
+      --empty: repeating-linear-gradient(-45deg, transparent 0 4px, #262c36 4px 5px);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 64px; background: var(--bg); color: var(--fg);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1600px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .legend-left, .legend-right { padding: 1px 6px; border-radius: 4px; }
+  .legend-left { background: var(--left-mark); }
+  .legend-right { background: var(--right-mark); }
+  a { color: inherit; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 32px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .bar { display: inline-block; width: 120px; height: 8px; background: var(--panel);
+         border: 1px solid var(--border); border-radius: 4px; overflow: hidden; vertical-align: middle; }
+  .bar span { display: block; height: 100%; background: var(--muted); }
+  .problem { color: #cf222e; }
+  details > summary { cursor: pointer; }
+  .document { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 24px; }
+  .document > summary { padding: 10px 14px; background: var(--panel); font-weight: 600;
+                        border-radius: 8px; position: sticky; top: 0; z-index: 2; }
+  .document[open] > summary { border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; }
+  .document > .problem { padding: 0 14px; }
+  .page { margin: 12px 14px; }
+  .page > summary { font-weight: 600; margin-bottom: 6px; }
+  .score { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .diff { display: grid; grid-template-columns: 3.5em minmax(0, 1fr) 3.5em minmax(0, 1fr);
+          font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .page > .diff { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .head { background: var(--panel); border-bottom: 1px solid var(--border); padding: 4px 8px;
+          font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .num { text-align: right; padding: 0 8px; color: var(--muted); user-select: none; }
+  .text { padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .num.right { border-left: 1px solid var(--border); }
+  .left:not(.equal) { background: var(--left-bg); }
+  .right:not(.equal) { background: var(--right-bg); }
+  .text.left mark { background: var(--left-mark); color: inherit; border-radius: 2px; }
+  .text.right mark { background: var(--right-mark); color: inherit; border-radius: 2px; }
+  .empty { background: var(--empty); }
+  .invisible { font-size: 9px; vertical-align: 1px; padding: 0 2px; margin: 0 1px; color: var(--muted);
+               border: 1px solid var(--border); border-radius: 3px; cursor: help; }
+  .fold { grid-column: 1 / -1; }
+  .fold > summary { list-style: none; background: var(--panel); color: var(--muted);
+                    padding: 2px 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .fold > summary::before { content: "⋯ "; }
+  .fold[open] > summary { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="legend-left">$left</span> vs <span class="legend-right">$right</span></h1>
+  <p class="sub">Run <strong>$run</strong> · whitespace normalised, blank lines ignored ·
+     similarity is measured on words and ignores line breaks ·
+     invisible characters are shown as markers, e.g. <span class="invisible">SHY</span> for soft hyphens</p>
+
+  <table>
+    <thead><tr><th>Document</th><th>Similarity</th><th>Pages differing</th><th></th></tr></thead>
+    <tbody>
+$overview
+    </tbody>
+  </table>
+
+$documents
+</main>
+</body>
+</html>

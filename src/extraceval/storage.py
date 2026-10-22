@@ -9,6 +9,7 @@
 
 import json
 import shutil
+from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,26 @@ class RunDirectory:
         if not target.exists():
             shutil.copy2(document.path, target)
         return Document(id=document.id, path=target)
+
+    def extractors(self) -> list[str]:
+        """Names of the extractors with outputs in this run."""
+        if not self.outputs_dir.is_dir():
+            return []
+        return sorted(p.name for p in self.outputs_dir.iterdir() if p.is_dir())
+
+    def require_extractors(self, names: Iterable[str]) -> None:
+        available = self.extractors()
+        for name in names:
+            if name not in available:
+                known = ", ".join(available) or "none"
+                raise ValueError(f"no outputs for {name!r} in {self.path} (available: {known})")
+
+    def documents(self) -> list[str]:
+        """Document ids in manifest order, falling back to whatever outputs exist."""
+        manifest = self.read_manifest()
+        if "documents" in manifest:
+            return [doc["id"] for doc in manifest["documents"]]
+        return sorted({p.stem for p in self.outputs_dir.glob("*/*.txt")})
 
     def output_path(self, extractor: str, document: str) -> Path:
         return self.outputs_dir / extractor / f"{document}.txt"
