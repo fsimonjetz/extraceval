@@ -91,13 +91,27 @@ runs/<name>/
 ### Comparing outputs
 
 ```bash
-extraceval compare runs/<name>                   # similarity matrix of all tools
+extraceval compare runs/<name>                   # agreement matrix of all tools
 extraceval compare runs/<name> pypdf pymupdf --open
 ```
 
-Without tool names (or with three or more), `compare` prints how similar each pair of tools'
-outputs is, plus each tool's mean similarity to the others. A tool that disagrees with all the
-rest stands out at once. Similarity is measured on words, so line breaks and spacing don't count.
+Without tool names (or with three or more), `compare` prints a matrix of how much each tool's
+output agrees with the others', next to each tool's speed in pages per second. `--metric`
+chooses what is compared:
+
+| Metric | Each cell shows | Answers |
+| --- | --- | --- |
+| `ngrams` (default) | share of the column tool's 3-word sequences the row tool also has | Are sentences intact? |
+| `words` | share of the column tool's words the row tool also has, in any order | Is the text there at all? |
+| `order` | similarity of the whole word sequences (symmetric) | Do the tools agree on the order of blocks? |
+
+So you can read off, for example, that a fast tool contains 90% of a slow tool's 3-word
+sequences. `ngrams` barely changes when two tools put whole articles in a different order, but
+drops sharply when a tool mixes up text, e.g. by reading across columns.
+
+All metrics compare words only: markup, punctuation and line breaks are ignored, and words
+hyphenated at a line break are joined again, so tools that rejoin lines into paragraphs are not
+penalised for it.
 
 With two tool names, it writes a self-contained HTML report to
 `runs/<name>/compare/pypdf-vs-pymupdf.html`. It lists the documents ordered by how much the two
