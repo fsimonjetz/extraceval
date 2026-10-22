@@ -75,3 +75,9 @@ def test_unknown_top_level_key(tmp_path: Path) -> None:
 def test_override_ignores_none_and_validates() -> None:
     config = Config(sample=5).override(sample=None, input="other", seed=3)
     assert (config.sample, config.input, config.seed) == (5, Path("other"), 3)
+
+
+def test_pymupdf4llm_text_requires_layout() -> None:
+    options = {"plain": {"tool": "pymupdf4llm", "format": "text", "layout": False}}
+    with pytest.raises(ConfigError, match="only available with layout"):
+        Config(extractors=["plain"], options=options).resolve_extractors()

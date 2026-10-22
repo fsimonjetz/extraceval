@@ -8,7 +8,8 @@ from extraceval.extractors.pdfplumber import Pdfplumber, PdfplumberOptions
 
 def test_builtins_are_discovered_via_entry_points() -> None:
     names = extractors.registry()
-    assert {"pypdfium2", "pypdf", "pymupdf", "pdfplumber", "pdfminer", "docling"} <= set(names)
+    builtins = {"pypdfium2", "pypdf", "pymupdf", "pymupdf4llm", "pdfplumber", "pdfminer", "docling"}
+    assert builtins <= set(names)
     assert names["pdfplumber"] is Pdfplumber
 
 
@@ -45,7 +46,9 @@ def test_missing_distribution_is_unavailable() -> None:
     assert not Missing.is_available()
 
 
-@pytest.mark.parametrize("name", ["pypdfium2", "pypdf", "pymupdf", "pdfplumber", "pdfminer"])
+@pytest.mark.parametrize(
+    "name", ["pypdfium2", "pypdf", "pymupdf", "pymupdf4llm", "pdfplumber", "pdfminer", "docling"]
+)
 def test_builtin_extracts_pages(name: str, pdf_dir: Path) -> None:
     cls = extractors.get(name)
     if not cls.is_available():
