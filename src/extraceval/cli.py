@@ -12,13 +12,16 @@ from rich.progress import Progress
 from rich.table import Table
 
 from extraceval import extractors
-from extraceval.compare import SimilarityMatrix, compare, similarity_matrix
+from extraceval.compare import Metric, SimilarityMatrix, compare, similarity_matrix
 from extraceval.config import ConfigError, load_config
 from extraceval.runner import Runner
 from extraceval.summary import ExtractorSummary, summarize
 
 app = typer.Typer(no_args_is_help=True, help="Compare PDF-to-text tools on your own documents.")
 console = Console()
+
+UNITS = {Metric.WORDS: "words", Metric.NGRAMS: "3-word sequences"}
+"""What the directional matrix metrics count, for titles and summaries."""
 
 
 @app.callback()
@@ -111,8 +114,22 @@ def compare_outputs(
         typer.Option("--output", "-o", help="Default: <run>/compare/<left>-vs-<right>.html"),
     ] = None,
     open_: Annotated[bool, typer.Option("--open", help="Open the report in a browser.")] = False,
+    metric: Annotated[
+        Metric,
+        typer.Option(
+            "--metric",
+            "-m",
+            help="Matrix metric: shared 3-word sequences (intact sentences), shared words "
+            "(text present), or similarity including the order of blocks.",
+        ),
+    ] = Metric.NGRAMS,
 ) -> None:
-    """Diff two extractors side by side in HTML, or print how similar all of them are."""
+    """Diff two extractors side by side in HTML, or print a matrix of how much they agree.
+
+    The matrix shows how much of the column tool's text the row tool also has on the same
+    page: as 3-word sequences by default, or as single words with --metric words. With
+    --metric order it shows how similar the outputs are, including the order of blocks.
+    """
     names = names or []
     if len(names) == 1:
         _fail("give two extractors for a diff, or none or three or more for a matrix")
@@ -129,16 +146,27 @@ def compare_outputs(
         return
 
     try:
-        matrix = similarity_matrix(run, names or None)
+        matrix = similarity_matrix(run, names or None, metric)
     except ValueError as exc:
         _fail(str(exc))
-    console.print(_matrix_table(matrix))
+    speed = {s.extractor: s.pages_per_second for s in summarize(run, matrix.extractors)}
+    console.print(_matrix_table(matrix, speed))
+
     pairs = matrix.ranked_pairs()
+    if not pairs:
+        hint = " Try --metric words." if matrix.metric == Metric.NGRAMS else ""
+        console.print(f"[yellow]There is too little text to compare.{hint}[/]")
+        return
+    (a, b, high), (c, d, low) = pairs[0], pairs[-1]
     if len(pairs) > 1:
-        console.print(f"Most similar:  {pairs[0][0]} / {pairs[0][1]} ({pairs[0][2]:.0%})")
-        console.print(f"Least similar: {pairs[-1][0]} / {pairs[-1][1]} ({pairs[-1][2]:.0%})")
-    left, right, _ = pairs[-1]
-    console.print(f"[dim]Inspect a pair with: extraceval compare {run} {left} {right} --open[/]")
+        if matrix.metric in UNITS:
+            unit = UNITS[matrix.metric]
+            console.print(f"Highest: {a} contains {high:.0%} of {b}'s {unit}")
+            console.print(f"Lowest:  {c} contains {low:.0%} of {d}'s {unit}")
+        else:
+            console.print(f"Most similar:  {a} / {b} ({high:.0%})")
+            console.print(f"Least similar: {c} / {d} ({low:.0%})")
+    console.print(f"[dim]Inspect a pair with: extraceval compare {run} {c} {d} --open[/]")
 
 
 @app.command("list")
@@ -157,27 +185,38 @@ def _fail(message: str) -> NoReturn:
     raise typer.Exit(1)
 
 
-def _matrix_table(matrix: SimilarityMatrix) -> Table:
-    """Word-level similarity per pair, coloured relative to the range of scores."""
-    scores = list(matrix.scores.values())
-    low, high = min(scores), max(scores)
+def _matrix_table(matrix: SimilarityMatrix, speed: dict[str, float | None]) -> Table:
+    """Scores per pair, coloured relative to their range, with each extractor's pages per
+    second alongside to weigh agreement against speed."""
+    scores = [score for score in matrix.scores.values() if score is not None]
+    low, high = (min(scores), max(scores)) if scores else (0.0, 1.0)
 
-    def cell(value: float) -> str:
+    def cell(value: float | None) -> str:
+        if value is None:
+            return "[dim]n/a[/]"
         position = (value - low) / (high - low) if high > low else 1.0
         colour = "green" if position > 2 / 3 else "yellow" if position > 1 / 3 else "red"
         return f"[{colour}]{value:.0%}[/]"
 
     # Columns are numbered so that the table stays narrow with many or long names.
     names = matrix.extractors
-    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title="Similarity of extracted text")
+    title = (
+        f"Share of the column tool's {UNITS[matrix.metric]} that the row tool also has"
+        if matrix.metric in UNITS
+        else "Similarity of the word sequences, including the order of blocks"
+    )
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title=title)
     table.add_column("extractor", no_wrap=True)
     for number in range(1, len(names) + 1):
         table.add_column(str(number), justify="right", no_wrap=True)
     table.add_column("mean", justify="right", no_wrap=True)
+    table.add_column("pages/s", justify="right", no_wrap=True)
     for number, row in enumerate(names, start=1):
         cells = ["[dim]-[/]" if row == column else cell(matrix[row, column]) for column in names]
         label = f"[dim]{number}[/] {row}"
-        table.add_row(label, *cells, f"[bold]{matrix.agreement(row):.0%}[/]")
+        agreement = matrix.agreement(row)
+        mean = f"[bold]{agreement:.0%}[/]" if agreement is not None else "[dim]n/a[/]"
+        table.add_row(label, *cells, mean, _rate(speed.get(row)))
     return table
 
 
