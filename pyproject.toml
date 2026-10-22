@@ -1,17 +1,66 @@
 [project]
 name = "extraceval"
 version = "0.1.0"
-description = "Add your description here"
+description = "Run PDF-to-text tools side by side on your own documents and compare speed and quality."
 readme = "README.md"
 authors = [
     { name = "Fabian Simonjetz", email = "fsimonjetz@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.7",
+    "pypdfium2>=4.30",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+pypdf = ["pypdf>=5.0"]
+pymupdf = ["pymupdf>=1.24"]
+pdfplumber = ["pdfplumber>=0.11"]
+pdfminer = ["pdfminer.six>=20240706"]
+docling = ["docling>=2.0"]
+all = ["extraceval[pypdf,pymupdf,pdfplumber,pdfminer,docling]"]
 
 [project.scripts]
-extraceval = "extraceval:main"
+extraceval = "extraceval.cli:app"
+
+[project.entry-points."extraceval.extractors"]
+pypdfium2 = "extraceval.extractors.pypdfium2:Pypdfium2"
+pypdf = "extraceval.extractors.pypdf:Pypdf"
+pymupdf = "extraceval.extractors.pymupdf:PyMuPDF"
+pdfplumber = "extraceval.extractors.pdfplumber:Pdfplumber"
+pdfminer = "extraceval.extractors.pdfminer:Pdfminer"
+docling = "extraceval.extractors.docling:Docling"
+
+[dependency-groups]
+dev = [
+    "fpdf2>=2.7",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pypdfium2.*", "pymupdf.*", "pdfplumber.*", "pdfminer.*", "docling.*", "fpdf.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["extraceval.extractors.*"]
+disallow_untyped_calls = false  # wrapped PDF libraries are often only partially typed
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
