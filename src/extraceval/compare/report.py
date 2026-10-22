@@ -14,8 +14,8 @@ from extraceval.storage import RunDirectory
 CONTEXT_LINES = 3
 """Unchanged lines shown around each change; longer unchanged stretches are folded."""
 
-INVISIBLE = re.compile("[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]")
-"""Format characters that render as nothing but make lines differ."""
+INVISIBLE = re.compile("[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\ufffe]")
+"""Characters that render as nothing (or as a box) but make lines differ."""
 INVISIBLE_LABELS = {
     "\u00ad": "SHY",
     "\u200b": "ZWSP",
@@ -23,6 +23,7 @@ INVISIBLE_LABELS = {
     "\u200d": "ZWJ",
     "\u2060": "WJ",
     "\ufeff": "BOM",
+    "\ufffe": "FFFE",  # PDFium's marker for a hyphen at a line break
 }
 
 
