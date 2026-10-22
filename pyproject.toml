@@ -9,17 +9,16 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.7",
-    "pypdfium2>=4.30",
     "typer>=0.12",
+    # extraction tools
+    "docling>=2.0",
+    "pdfminer.six>=20240706",
+    "pdfplumber>=0.11",
+    "pymupdf>=1.24",
+    "pymupdf4llm>=0.2",
+    "pypdf>=5.0",
+    "pypdfium2>=4.30",
 ]
-
-[project.optional-dependencies]
-pypdf = ["pypdf>=5.0"]
-pymupdf = ["pymupdf>=1.24"]
-pdfplumber = ["pdfplumber>=0.11"]
-pdfminer = ["pdfminer.six>=20240706"]
-docling = ["docling>=2.0"]
-all = ["extraceval[pypdf,pymupdf,pdfplumber,pdfminer,docling]"]
 
 [project.scripts]
 extraceval = "extraceval.cli:app"
@@ -31,6 +30,7 @@ pymupdf = "extraceval.extractors.pymupdf:PyMuPDF"
 pdfplumber = "extraceval.extractors.pdfplumber:Pdfplumber"
 pdfminer = "extraceval.extractors.pdfminer:Pdfminer"
 docling = "extraceval.extractors.docling:Docling"
+pymupdf4llm = "extraceval.extractors.pymupdf4llm:PyMuPDF4LLM"
 
 [dependency-groups]
 dev = [
@@ -55,7 +55,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2.*", "pymupdf.*", "pdfplumber.*", "pdfminer.*", "docling.*", "fpdf.*"]
+module = ["pypdfium2.*", "pymupdf.*", "pymupdf4llm.*", "pdfplumber.*", "pdfminer.*", "docling.*", "fpdf.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

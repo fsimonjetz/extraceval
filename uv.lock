@@ -737,33 +737,15 @@ name = "extraceval"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "docling" },
+    { name = "pdfminer-six" },
+    { name = "pdfplumber" },
     { name = "pydantic" },
+    { name = "pymupdf" },
+    { name = "pymupdf4llm" },
+    { name = "pypdf" },
     { name = "pypdfium2" },
     { name = "typer" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "docling" },
-    { name = "pdfminer-six" },
-    { name = "pdfplumber" },
-    { name = "pymupdf" },
-    { name = "pypdf" },
-]
-docling = [
-    { name = "docling" },
-]
-pdfminer = [
-    { name = "pdfminer-six" },
-]
-pdfplumber = [
-    { name = "pdfplumber" },
-]
-pymupdf = [
-    { name = "pymupdf" },
-]
-pypdf = [
-    { name = "pypdf" },
 ]
 
 [package.dev-dependencies]
@@ -776,17 +758,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "docling", marker = "extra == 'docling'", specifier = ">=2.0" },
-    { name = "extraceval", extras = ["pypdf", "pymupdf", "pdfplumber", "pdfminer", "docling"], marker = "extra == 'all'" },
-    { name = "pdfminer-six", marker = "extra == 'pdfminer'", specifier = ">=20240706" },
-    { name = "pdfplumber", marker = "extra == 'pdfplumber'", specifier = ">=0.11" },
+    { name = "docling", specifier = ">=2.0" },
+    { name = "pdfminer-six", specifier = ">=20240706" },
+    { name = "pdfplumber", specifier = ">=0.11" },
     { name = "pydantic", specifier = ">=2.7" },
-    { name = "pymupdf", marker = "extra == 'pymupdf'", specifier = ">=1.24" },
-    { name = "pypdf", marker = "extra == 'pypdf'", specifier = ">=5.0" },
+    { name = "pymupdf", specifier = ">=1.24" },
+    { name = "pymupdf4llm", specifier = ">=0.2" },
+    { name = "pypdf", specifier = ">=5.0" },
     { name = "pypdfium2", specifier = ">=4.30" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["pypdf", "pymupdf", "pdfplumber", "pdfminer", "docling", "all"]
 
 [package.metadata.requires-dev]
 dev = [
