@@ -27,9 +27,30 @@ your use case.
 pip install extraceval
 ```
 
-This installs all supported tools: pypdfium2, pypdf, PyMuPDF, pymupdf4llm, pdfplumber,
-pdfminer.six and Docling. Docling pulls in PyTorch and downloads its models on first use. Note
-that PyMuPDF and pymupdf4llm are AGPL-licensed.
+This installs pypdfium2, pypdf, PyMuPDF, pymupdf4llm, pdfplumber, pdfminer.six and Docling.
+Docling pulls in PyTorch and downloads its models on first use. Note that PyMuPDF and pymupdf4llm
+are AGPL-licensed.
+
+### Marker
+
+Marker is optional, as it requires older versions of some of the other tools' dependencies (e.g.
+Pillow) and a separate program for OCR:
+
+```bash
+pip install "extraceval[marker]"
+```
+
+Marker runs OCR (for pages without a usable text layer, or all pages with `force_ocr`) on a
+vision-language model served by a separate program, which has to be installed manually:
+
+- llama.cpp on macOS and on machines without an NVIDIA GPU: `brew install llama.cpp`, or download
+  `llama-server` from the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases) and
+  put it on your `PATH` (or point the `LLAMA_CPP_BINARY` environment variable to it).
+- vLLM on machines with an NVIDIA GPU: `pip install vllm`.
+
+Without it, documents that need OCR fail with an error; set `disable_ocr = true` under
+`[options.marker]` to use the text layer only. Marker downloads its models on first use; their
+weights are free only for research, personal use and small companies.
 
 ## Usage
 
