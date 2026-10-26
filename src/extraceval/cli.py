@@ -14,6 +14,7 @@ from rich.table import Table
 from extraceval import extractors
 from extraceval.compare import Metric, SimilarityMatrix, compare, similarity_matrix
 from extraceval.config import ConfigError, load_config
+from extraceval.initialize import PAGES, InitResult, initialize
 from extraceval.runner import Runner
 from extraceval.summary import ExtractorSummary, summarize
 
@@ -86,6 +87,37 @@ def run(
     console.print(f"Outputs written to [bold]{result.path}[/]")
     if result.tool_log:
         console.print(f"[dim]Messages from the tools are in {result.tool_log}[/]")
+
+
+@app.command()
+def init(
+    config: Annotated[
+        Path | None,
+        typer.Option("--config", "-c", help="Config file. Default: ./extraceval.toml if present."),
+    ] = None,
+    extractor: Annotated[
+        list[str] | None,
+        typer.Option("--extractor", "-e", help="Extractor to prepare; repeatable. Default: all."),
+    ] = None,
+) -> None:
+    """Download the tools' models and other files ahead of time, for use without internet.
+
+    Runs each extractor, with its configured options, on a page with a text layer and on a
+    scanned page. Exits with an error if any of them fails.
+    """
+    try:
+        cfg = load_config(config).override(extractors=extractor)
+        results = initialize(
+            cfg, on_start=lambda spec: console.print(f"Preparing [bold]{spec.name}[/]")
+        )
+    except ConfigError as exc:
+        _fail(str(exc))
+    console.print(_init_table(results))
+    failed = [r for r in results if not r.ok]
+    for r in failed:
+        console.print(f"[red]{r.extractor}:[/] {r.error}")
+    if failed:
+        _fail(f"could not prepare {', '.join(r.extractor for r in failed)}")
 
 
 @app.command("summary")
@@ -217,6 +249,21 @@ def _matrix_table(matrix: SimilarityMatrix, speed: dict[str, float | None]) -> T
         agreement = matrix.agreement(row)
         mean = f"[bold]{agreement:.0%}[/]" if agreement is not None else "[dim]n/a[/]"
         table.add_row(label, *cells, mean, _rate(speed.get(row)))
+    return table
+
+
+def _init_table(results: list[InitResult]) -> Table:
+    """Characters per test page; none on the scanned page means the tool does no OCR."""
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False)
+    table.add_column("extractor", no_wrap=True)
+    table.add_column("status")
+    table.add_column("s", justify="right", no_wrap=True)
+    for kind in PAGES:
+        table.add_column(f"{kind} chars", justify="right", no_wrap=True)
+    for r in results:
+        chars = [f"{r.chars[kind]:,}" if kind in r.chars else "-" for kind in PAGES]
+        status = "[green]ok[/]" if r.ok else "[red]failed[/]"
+        table.add_row(r.extractor, status, _seconds(r.seconds), *chars)
     return table
 
 
