@@ -20,6 +20,9 @@ dependencies = [
     "pypdfium2>=4.30",
 ]
 
+[project.optional-dependencies]
+marker = ["marker-pdf>=2.0"]
+
 [project.scripts]
 extraceval = "extraceval.cli:app"
 
@@ -31,6 +34,7 @@ pdfplumber = "extraceval.extractors.pdfplumber:Pdfplumber"
 pdfminer = "extraceval.extractors.pdfminer:Pdfminer"
 docling = "extraceval.extractors.docling:Docling"
 pymupdf4llm = "extraceval.extractors.pymupdf4llm:PyMuPDF4LLM"
+marker = "extraceval.extractors.marker:Marker"
 
 [dependency-groups]
 dev = [
@@ -55,7 +59,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2.*", "pymupdf.*", "pymupdf4llm.*", "pdfplumber.*", "pdfminer.*", "docling.*", "fpdf.*"]
+module = ["pypdfium2.*", "pymupdf.*", "pymupdf4llm.*", "pdfplumber.*", "pdfminer.*", "docling.*", "marker.*", "fpdf.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
