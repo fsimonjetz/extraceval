@@ -52,6 +52,21 @@ Without it, documents that need OCR fail with an error; set `disable_ocr = true`
 `[options.marker]` to use the text layer only. Marker downloads its models on first use; their
 weights are free only for research, personal use and small companies.
 
+### Offline use
+
+Several tools download models the first time they run. To get these downloads out of the way,
+e.g. before moving to a machine without internet access, run
+
+```bash
+extraceval init
+```
+
+This runs each installed tool, with the options from your configuration, on a bundled page with a
+text layer and on a scanned page, which makes the tools load their OCR models too. It shows how
+much text each tool got from each page (none from the scanned page means the tool does no OCR)
+and fails if any tool does. Afterwards, set `HF_HUB_OFFLINE=1` so that a missing model fails
+straight away instead of after a network timeout.
+
 ## Usage
 
 ```bash
