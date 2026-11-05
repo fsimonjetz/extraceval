@@ -26,6 +26,7 @@ def test_variants_and_options(tmp_path: Path) -> None:
     )
     config = load_config(config_file)
     assert config.input == tmp_path / "data"
+    assert config.gold == tmp_path / "gold"
     plain, layout = config.resolve_extractors()
     assert (plain.name, plain.tool, plain.options) == (
         "pdfplumber",
