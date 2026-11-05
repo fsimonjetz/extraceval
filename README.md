@@ -1,25 +1,12 @@
-# ExtracEval: A PDF-to-Text Evaluation Workbench with a Local VLM Judge
+# ExtracEval: Choosing a PDF-to-Text Tool for Newspaper Editions
 
-Many types of textual data are only available as PDFs. To use them for NLP and other
-applications, they are commonly converted to plain text first. Many tools exist for this, but they
-differ considerably in speed and output quality, and good results on standard benchmarks do not
-guarantee that a tool handles the idiosyncrasies of *your* specific documents. Comparing tools
-usually means setting up and configuring each one, then assessing output quality by either
+ExtracEval runs whole newspaper editions (PDFs) through several PDF-to-text tools in a single run,
+profiles the speed of each, and shows where their outputs diverge: as a matrix of how much the
+tools agree, and as a side-by-side diff of two tools. The result shows quality and speed per
+tool, to choose the trade-off that fits the corpus.
 
-- manually inspecting the output against the source PDFs, or
-- compiling gold-standard data first.
-
-ExtracEval streamlines this process: it runs a sample of your documents through multiple
-PDF-to-text tools in a single run, profiles the speed of each, and offers two ways to assess
-quality *without gold data*:
-
-1. A side-by-side comparison interface that highlights where the outputs diverge, pointing to
-   likely extraction errors, and
-2. A judge based on a locally run vision-language model (VLM) that compares each output
-   against the rendered page and ranks the tools. No data leaves your machine.
-
-The result is a report of quality and speed per tool, so you can choose the trade-off that fits
-your use case.
+It is meant to be installed and prepared on a machine with internet access and then used
+without it (see [Offline use](#offline-use)).
 
 ## Installation
 
@@ -30,27 +17,6 @@ pip install extraceval
 This installs pypdfium2, pypdf, PyMuPDF, pymupdf4llm, pdfplumber, pdfminer.six and Docling.
 Docling pulls in PyTorch and downloads its models on first use. Note that PyMuPDF and pymupdf4llm
 are AGPL-licensed.
-
-### Marker
-
-Marker is optional, as it requires older versions of some of the other tools' dependencies (e.g.
-Pillow) and a separate program for OCR:
-
-```bash
-pip install "extraceval[marker]"
-```
-
-Marker runs OCR (for pages without a usable text layer, or all pages with `force_ocr`) on a
-vision-language model served by a separate program, which has to be installed manually:
-
-- llama.cpp on macOS and on machines without an NVIDIA GPU: `brew install llama.cpp`, or download
-  `llama-server` from the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases) and
-  put it on your `PATH` (or point the `LLAMA_CPP_BINARY` environment variable to it).
-- vLLM on machines with an NVIDIA GPU: `pip install vllm`.
-
-Without it, documents that need OCR fail with an error; set `disable_ocr = true` under
-`[options.marker]` to use the text layer only. Marker downloads its models on first use; their
-weights are free only for research, personal use and small companies.
 
 ### Offline use
 
@@ -71,8 +37,8 @@ straight away instead of after a network timeout.
 
 ```bash
 extraceval list                      # known tools, installed versions, options
-extraceval run pdfs/                 # all installed tools on all PDFs in pdfs/
-extraceval run pdfs/ -n 20 -e pypdf -e pymupdf --name trial
+extraceval run pdfs/                 # all tools on all PDFs in pdfs/
+extraceval run pdfs/ -e pypdf -e pymupdf --name trial
 ```
 
 After a run, a table shows each tool's success rate and speed in pages per second;
@@ -81,26 +47,18 @@ one-off costs such as imports and model loading are measured separately as setup
 includes extracting a tiny bundled warm-up page with each tool.
 
 Re-using a run name resumes it: document/tool pairs that already succeeded are skipped (use
-`--force` to redo them). The same is available from Python:
-
-```python
-import extraceval
-
-result = extraceval.run("pdfs/", sample=20)
-```
+`--force` to redo them).
 
 ### Configuration
 
-Without configuration, every installed tool runs with its default settings. To change that, put
+Without configuration, every tool runs with its default settings. To change that, put
 an `extraceval.toml` in the working directory (or a `[tool.extraceval]` table in
 `pyproject.toml`). Command-line options take precedence.
 
 ```toml
 input = "pdfs"
 output = "runs"
-sample = 20
-seed = 0
-extractors = ["pypdfium2", "pymupdf", "pdfplumber-layout"]  # omit to run all installed
+extractors = ["pypdfium2", "pymupdf", "pdfplumber-layout"]  # omit to run all
 
 [options.pymupdf]
 sort = true
@@ -118,7 +76,7 @@ Each run gets its own directory:
 ```
 runs/<name>/
   manifest.json                        config, tool versions and options, environment, documents
-  sample/<document>.pdf                copies of the sampled PDFs
+  pdfs/<document>.pdf                  copies of the input PDFs
   outputs/<extractor>/<document>.txt   extracted text, pages separated by form feeds (\f)
   results.jsonl                        status, seconds, pages and characters per document and tool
   tools.log                            warnings and other output from the tools, by tool and document
@@ -157,28 +115,6 @@ as markers.
 
 ### Adding a tool
 
-Subclass `Extractor` with an options model and register it, either at runtime with
-`@extraceval.register("name")` or from any package through an entry point in the
-`extraceval.extractors` group:
-
-```python
-from pathlib import Path
-from extraceval import Extractor, ExtractorOptions
-
-
-class MyToolOptions(ExtractorOptions):
-    fast: bool = False
-
-
-class MyTool(Extractor[MyToolOptions]):
-    distribution = "mytool"  # PyPI name, used for availability and version
-
-    def extract(self, path: Path) -> list[str]:  # one string per page
-        import mytool
-        return mytool.pages(path, fast=self.options.fast)
-```
-
-```toml
-[project.entry-points."extraceval.extractors"]
-mytool = "mypackage.extractor:MyTool"
-```
+Add a module to `src/extraceval/extractors/` with a subclass of `Extractor` that returns one
+string per page, add it to `EXTRACTORS` in `extractors/__init__.py`, and add the tool to the
+dependencies in `pyproject.toml`.
