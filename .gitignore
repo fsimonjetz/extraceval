@@ -11,3 +11,6 @@ wheels/
 
 # ExtracEval run outputs
 runs/
+
+# MacOS meta files
+.DS_Store
