@@ -1,9 +1,10 @@
 # ExtracEval: Choosing a PDF-to-Text Tool for Newspaper Editions
 
 ExtracEval runs whole newspaper editions (PDFs) through several PDF-to-text tools in a single run,
-profiles the speed of each, and shows where their outputs diverge: as a matrix of how much the
-tools agree, and as a side-by-side diff of two tools. The result shows quality and speed per
-tool, to choose the trade-off that fits the corpus.
+profiles the speed of each, and measures quality in two ways: against gold texts of individual
+articles (e.g. copied from a press database), and by where the tools' outputs diverge, as a
+matrix of how much they agree and as a side-by-side diff of two tools. The result shows quality
+and speed per tool, to choose the trade-off that fits the corpus.
 
 It is meant to be installed and prepared on a machine with internet access and then used
 without it (see [Offline use](#offline-use)).
@@ -58,6 +59,7 @@ an `extraceval.toml` in the working directory (or a `[tool.extraceval]` table in
 ```toml
 input = "pdfs"
 output = "runs"
+gold = "gold"
 extractors = ["pypdfium2", "pymupdf", "pdfplumber-layout"]  # omit to run all
 
 [options.pymupdf]
@@ -81,6 +83,43 @@ runs/<name>/
   results.jsonl                        status, seconds, pages and characters per document and tool
   tools.log                            warnings and other output from the tools, by tool and document
 ```
+
+### Scoring against gold texts
+
+Gold texts are clean versions of individual articles, one plain-text file per article, in a
+folder named after the PDF they appear in, with the page the article starts on as the file name:
+
+```
+gold/
+  SPIEGEL_2026_37/        for SPIEGEL_2026_37.pdf
+    6.txt
+    13.txt
+```
+
+```bash
+extraceval score runs/<name>              # all tools in the run
+extraceval score runs/<name> --articles   # also show the scores per article
+```
+
+`score` shows, per tool, the mean share of each gold article it recovers, next to its speed:
+
+| Column | Share of the article's | Answers |
+| --- | --- | --- |
+| 3-word seq. | 3-word sequences that the tool also has | Are sentences intact? |
+| words | words that the tool also has, in any order | Is the text there at all? |
+
+As the gold covers only some articles of an edition, only this recall is measured: text a tool
+adds, such as headers, does not count against it. Words are compared as in `compare` below,
+and also ignoring case. Each article counts equally, regardless of its length.
+
+Each article is looked for on all pages, as articles are often continued on later pages and the
+start page may not be exact (e.g. when an article opens with a full-page photo). It is located
+on the pages on which the tools' outputs contain, on average, at least 5% of its 3-word
+sequences, and every tool is scored on these same pages. `score` notes articles found on other
+pages than the file name says, and articles that are not found at all and therefore not scored.
+
+The gold directory defaults to `gold` in the working directory; change it with `gold` in the
+configuration or `--gold`.
 
 ### Comparing outputs
 
