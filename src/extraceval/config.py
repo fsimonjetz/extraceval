@@ -53,6 +53,8 @@ class Config(BaseModel):
     """A PDF file or a directory searched recursively for PDFs."""
     output: Path = Path("runs")
     """Directory in which each run gets its own subdirectory."""
+    gold: Path = Path("gold")
+    """Gold texts, as ``<gold>/<PDF file stem>/<label>.txt``."""
     extractors: list[str] | None = None
     """Extractors to run, by name; ``None`` runs every built-in tool and every defined variant."""
     options: dict[str, dict[str, Any]] = {}
@@ -103,7 +105,8 @@ def load_config(path: Path | str | None = None) -> Config:
     except ValidationError as exc:
         raise ConfigError(f"invalid config in {path}:\n{exc}") from None
     base = path.parent
-    return config.model_copy(update={"input": base / config.input, "output": base / config.output})
+    paths = {key: base / getattr(config, key) for key in ("input", "output", "gold")}
+    return config.model_copy(update=paths)
 
 
 def _read_table(path: Path) -> dict[str, Any] | None:

@@ -14,6 +14,7 @@ from rich.table import Table
 from extraceval import extractors
 from extraceval.compare import Metric, SimilarityMatrix, compare, similarity_matrix
 from extraceval.config import ConfigError, load_config
+from extraceval.gold import GoldReport, page_ranges, score
 from extraceval.initialize import PAGES, InitResult, initialize
 from extraceval.runner import Runner
 from extraceval.summary import ExtractorSummary, summarize
@@ -194,6 +195,58 @@ def compare_outputs(
     console.print(f"[dim]Inspect a pair with: extraceval compare {run} {c} {d} --open[/]")
 
 
+@app.command("score")
+def score_outputs(
+    run: Annotated[Path, typer.Argument(help="Run directory, e.g. runs/my-run.")],
+    names: Annotated[
+        list[str] | None,
+        typer.Argument(metavar="[EXTRACTORS]...", help="Extractors to score. Default: all."),
+    ] = None,
+    gold: Annotated[
+        Path | None,
+        typer.Option("--gold", "-g", help="Gold directory. Overrides the config (default: gold)."),
+    ] = None,
+    config: Annotated[
+        Path | None,
+        typer.Option("--config", "-c", help="Config file. Default: ./extraceval.toml if present."),
+    ] = None,
+    articles: Annotated[
+        bool, typer.Option("--articles", "-a", help="Also show the scores per article.")
+    ] = False,
+) -> None:
+    """Score extractors by how much of each gold article they recover.
+
+    Gold texts are read from <gold>/<PDF file stem>/<page>.txt, one article per file.
+    """
+    try:
+        gold_dir = load_config(config).override(gold=gold).gold
+        report = score(run, gold_dir, names or None)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        _fail(str(exc))
+
+    for folder in report.unmatched:
+        console.print(f"[yellow]No document named {folder!r} in the run; skipping its gold.[/]")
+    if not report.found:
+        _fail(f"none of the gold articles in {gold_dir} were found in the run")
+
+    speed = {s.extractor: s.pages_per_second for s in summarize(run, report.extractors)}
+    ranked = sorted(report.extractors, key=lambda name: _ngram_score(report, name), reverse=True)
+    console.print(_gold_table(report, ranked, speed))
+    if articles:
+        console.print(_articles_table(report, ranked))
+
+    for result in report.articles:
+        name = result.article.name
+        if not result.pages:
+            console.print(f"[yellow]{name} was not found in any output; it is not scored.[/]")
+        elif result.misplaced:
+            pages = "page" if len(result.pages) == 1 else "pages"
+            found = f"{pages} {page_ranges(result.pages)}"
+            console.print(
+                f"[dim]{name} was found on {found}, not on page {result.article.page}.[/]"
+            )
+
+
 @app.command("list")
 def list_extractors() -> None:
     """Show the built-in extractors, their versions and options."""
@@ -241,6 +294,51 @@ def _matrix_table(matrix: SimilarityMatrix, speed: dict[str, float | None]) -> T
         agreement = matrix.agreement(row)
         mean = f"[bold]{agreement:.0%}[/]" if agreement is not None else "[dim]n/a[/]"
         table.add_row(label, *cells, mean, _rate(speed.get(row)))
+    return table
+
+
+def _ngram_score(report: GoldReport, extractor: str) -> float:
+    mean = report.mean(extractor)
+    return mean.ngrams if mean else -1.0
+
+
+def _recall_cell(value: float | None) -> str:
+    if value is None:
+        return "[dim]n/a[/]"
+    colour = "green" if value >= 0.9 else "yellow" if value >= 0.7 else "red"
+    return f"[{colour}]{value:.0%}[/]"
+
+
+def _gold_table(report: GoldReport, ranked: list[str], speed: dict[str, float | None]) -> Table:
+    """Mean share of the gold articles each extractor recovers, best first."""
+    count = len(report.found)
+    title = f"Share of {count} gold article{'s' if count != 1 else ''} each tool recovers"
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title=title)
+    table.add_column("extractor", no_wrap=True)
+    for column in ("3-word seq.", "words", "pages/s"):
+        table.add_column(column, justify="right", no_wrap=True)
+    for number, name in enumerate(ranked, start=1):
+        mean = report.mean(name)
+        table.add_row(
+            f"[dim]{number}[/] {name}",
+            _recall_cell(mean.ngrams if mean else None),
+            _recall_cell(mean.words if mean else None),
+            _rate(speed.get(name)),
+        )
+    return table
+
+
+def _articles_table(report: GoldReport, ranked: list[str]) -> Table:
+    """Share of each article's 3-word sequences per extractor, numbered as in the main table."""
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title="3-word sequences per article")
+    table.add_column("article", no_wrap=True)
+    table.add_column("pages", no_wrap=True)
+    for number in range(1, len(ranked) + 1):
+        table.add_column(str(number), justify="right", no_wrap=True)
+    for result in report.found:
+        scores = [result.scores.get(name) for name in ranked]
+        cells = [_recall_cell(s.ngrams if s else None) for s in scores]
+        table.add_row(result.article.name, page_ranges(result.pages), *cells)
     return table
 
 
