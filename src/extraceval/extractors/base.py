@@ -1,7 +1,7 @@
 """The interface every PDF-to-text tool implements."""
 
 from abc import ABC, abstractmethod
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any, ClassVar, cast, get_args, get_origin
@@ -20,11 +20,11 @@ class Extractor[O: ExtractorOptions](ABC):
 
     Subclasses set ``distribution`` and implement ``extract``. The options model is taken from
     the type parameter, so ``class Foo(Extractor[FooOptions])`` is all it takes. Import the
-    underlying library inside ``setup``/``extract`` so this module imports without it installed.
+    underlying library inside ``setup``/``extract`` so that its import time counts as setup.
     """
 
     distribution: ClassVar[str]
-    """Name of the PyPI distribution providing the tool, used for availability and versioning."""
+    """Name of the PyPI distribution providing the tool, used to record its version."""
 
     options_model: ClassVar[type[ExtractorOptions]] = ExtractorOptions
 
@@ -40,16 +40,8 @@ class Extractor[O: ExtractorOptions](ABC):
         self.options: O = options if options is not None else cast(O, self.options_model())
 
     @classmethod
-    def version(cls) -> str | None:
-        """Installed version of the underlying tool, or ``None`` if it is not installed."""
-        try:
-            return version(cls.distribution)
-        except PackageNotFoundError:
-            return None
-
-    @classmethod
-    def is_available(cls) -> bool:
-        return cls.version() is not None
+    def version(cls) -> str:
+        return version(cls.distribution)
 
     def setup(self) -> None:  # noqa: B027 - optional hook, deliberately not abstract
         """One-time initialisation such as loading models. Timed separately from extraction."""

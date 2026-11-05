@@ -51,8 +51,6 @@ def run(
         Path | None,
         typer.Option("--config", "-c", help="Config file. Default: ./extraceval.toml if present."),
     ] = None,
-    sample: Annotated[int | None, typer.Option("--sample", "-n", min=1)] = None,
-    seed: Annotated[int | None, typer.Option()] = None,
     extractor: Annotated[
         list[str] | None,
         typer.Option("--extractor", "-e", help="Extractor to run; repeatable. Default: all."),
@@ -63,19 +61,14 @@ def run(
     ] = None,
     force: Annotated[bool, typer.Option(help="Re-run pairs that already succeeded.")] = False,
 ) -> None:
-    """Run extractors over a sample of PDFs and save their outputs."""
+    """Run extractors over PDFs and save their outputs."""
     try:
-        cfg = load_config(config).override(
-            input=input, sample=sample, seed=seed, extractors=extractor, output=output
-        )
+        cfg = load_config(config).override(input=input, extractors=extractor, output=output)
         runner = Runner(cfg, name=name, force=force)
     except (ConfigError, FileNotFoundError) as exc:
         console.print(f"[red]error:[/] {exc}")
         raise typer.Exit(1) from None
 
-    if not runner.extractors:
-        console.print("[red]error:[/] none of the selected extractors is installed")
-        raise typer.Exit(1)
     console.print(
         f"Running {len(runner.extractors)} extractor(s) on {len(runner.documents)} document(s)"
     )
@@ -203,12 +196,11 @@ def compare_outputs(
 
 @app.command("list")
 def list_extractors() -> None:
-    """Show known extractors and whether they are installed."""
+    """Show the built-in extractors, their versions and options."""
     table = Table("extractor", "package", "version", "options")
-    for name, cls in extractors.registry().items():
-        version = cls.version() or "[dim]not installed[/]"
+    for name, cls in extractors.EXTRACTORS.items():
         options = ", ".join(cls.options_model.model_fields) or "-"
-        table.add_row(name, cls.distribution, version, options)
+        table.add_row(name, cls.distribution, cls.version(), options)
     console.print(table)
 
 

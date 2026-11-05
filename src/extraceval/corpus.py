@@ -1,7 +1,6 @@
-"""Finding and sampling the input PDFs."""
+"""Finding the input PDFs."""
 
 import hashlib
-import random
 import re
 from pathlib import Path
 
@@ -17,21 +16,14 @@ def discover(input: Path) -> list[Path]:
     return sorted(p for p in input.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
 
 
-def sample(paths: list[Path], n: int | None, seed: int = 0) -> list[Path]:
-    """Draw ``n`` paths reproducibly for a given seed; all of them if ``n`` is ``None``."""
-    if n is None or n >= len(paths):
-        return list(paths)
-    return sorted(random.Random(seed).sample(paths, n))
-
-
 def document_id(path: Path) -> str:
     stem = re.sub(r"[^\w.-]+", "_", path.stem).strip("_") or "document"
     digest = hashlib.sha256(path.read_bytes()).hexdigest()[:8]
     return f"{stem}-{digest}"
 
 
-def load(input: Path, n: int | None = None, seed: int = 0) -> list[Document]:
+def load(input: Path) -> list[Document]:
     paths = discover(input)
     if not paths:
         raise FileNotFoundError(f"no PDFs found in {input}")
-    return [Document(id=document_id(p), path=p) for p in sample(paths, n, seed)]
+    return [Document(id=document_id(p), path=p) for p in paths]
