@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from extraceval import summarize
 from extraceval.cli import app
 from extraceval.models import ExtractionResult
 from extraceval.storage import RunDirectory
+from extraceval.summary import summarize
 
 
 @pytest.fixture

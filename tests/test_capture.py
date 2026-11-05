@@ -1,15 +1,17 @@
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from extraceval import Config, Extractor, ExtractorOptions, Runner, register
+from extraceval.config import Config
+from extraceval.extractors import Extractor, ExtractorOptions
+from extraceval.runner import Runner
 
 noisy_logger = logging.getLogger("noisy_tool")
 
 
-@register("fake-noisy")
 class Noisy(Extractor[ExtractorOptions]):
     distribution = "pytest"
 
@@ -27,12 +29,16 @@ class Noisy(Extractor[ExtractorOptions]):
         return ["text"]
 
 
-@register("fake-silent")
 class Silent(Extractor[ExtractorOptions]):
     distribution = "pytest"
 
     def extract(self, path: Path) -> list[str]:
         return ["text"]
+
+
+@pytest.fixture(autouse=True)
+def fakes(register: Callable[..., None]) -> None:
+    register(**{"fake-noisy": Noisy, "fake-silent": Silent})
 
 
 def run(pdf_dir: Path, tmp_path: Path, extractor: str) -> Runner:

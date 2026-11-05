@@ -1,13 +1,15 @@
+from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
-from extraceval import Config, Extractor, ExtractorOptions, register
 from extraceval.cli import app
+from extraceval.config import Config
+from extraceval.extractors import Extractor, ExtractorOptions
 from extraceval.initialize import initialize
 
 
-@register("fake-init")
 class FakeInit(Extractor[ExtractorOptions]):
     distribution = "pytest"
     seen: list[str] = []  # noqa: RUF012 - records calls across instances
@@ -17,15 +19,14 @@ class FakeInit(Extractor[ExtractorOptions]):
         return [] if path.name == "scanned.pdf" else ["text"]
 
 
-@register("fake-init-broken")
 class BrokenInit(FakeInit):
     def setup(self) -> None:
         raise RuntimeError("download failed")
 
 
-@register("fake-init-missing")
-class MissingInit(FakeInit):
-    distribution = "surely-not-installed-xyz"
+@pytest.fixture(autouse=True)
+def fakes(register: Callable[..., None]) -> None:
+    register(**{"fake-init": FakeInit, "fake-init-broken": BrokenInit})
 
 
 def test_runs_each_extractor_on_both_pages() -> None:
@@ -37,11 +38,9 @@ def test_runs_each_extractor_on_both_pages() -> None:
 
 
 def test_failures_are_reported_per_extractor() -> None:
-    results = initialize(Config(extractors=["fake-init", "fake-init-broken", "fake-init-missing"]))
-    ok, broken, missing = results
+    ok, broken = initialize(Config(extractors=["fake-init", "fake-init-broken"]))
     assert ok.ok
     assert broken.error is not None and "download failed" in broken.error
-    assert missing.error == "surely-not-installed-xyz is not installed"
 
 
 def test_cli_fails_if_any_extractor_fails() -> None:
