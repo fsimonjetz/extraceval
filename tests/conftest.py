@@ -1,7 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fpdf import FPDF
+
+from extraceval.extractors import EXTRACTORS, Extractor
 
 
 def make_pdf(path: Path, pages: list[str]) -> Path:
@@ -23,3 +27,14 @@ def pdf_dir(tmp_path: Path) -> Path:
         make_pdf(root / f"doc {i}.pdf", [f"Document {i}, page one.", f"Document {i}, page two."])
     make_pdf(root / "nested" / "deep.PDF", ["Nested page one.", "Nested page two."])
     return root
+
+
+@pytest.fixture
+def register(monkeypatch: pytest.MonkeyPatch) -> Callable[..., None]:
+    """Add fake extractors by name for the duration of a test."""
+
+    def add(**fakes: type[Extractor[Any]]) -> None:
+        for name, cls in fakes.items():
+            monkeypatch.setitem(EXTRACTORS, name, cls)
+
+    return add

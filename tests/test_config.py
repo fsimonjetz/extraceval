@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from extraceval import Config, ConfigError, load_config
+from extraceval import extractors
+from extraceval.config import Config, ConfigError, load_config
 from extraceval.extractors.pdfplumber import PdfplumberOptions
 
 
-def test_defaults_run_all_installed_extractors() -> None:
+def test_defaults_run_all_builtin_extractors() -> None:
     specs = Config().resolve_extractors()
-    assert "pypdfium2" in [spec.name for spec in specs]
-    assert all(spec.cls.is_available() for spec in specs)
+    assert [spec.name for spec in specs] == list(extractors.EXTRACTORS)
 
 
 def test_variants_and_options(tmp_path: Path) -> None:
@@ -26,6 +26,7 @@ def test_variants_and_options(tmp_path: Path) -> None:
     )
     config = load_config(config_file)
     assert config.input == tmp_path / "data"
+    assert config.gold == tmp_path / "gold"
     plain, layout = config.resolve_extractors()
     assert (plain.name, plain.tool, plain.options) == (
         "pdfplumber",
@@ -42,9 +43,9 @@ def test_variants_are_included_by_default() -> None:
 
 
 def test_pyproject_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    (tmp_path / "pyproject.toml").write_text("[tool.extraceval]\nsample = 3\n")
+    (tmp_path / "pyproject.toml").write_text('[tool.extraceval]\ninput = "data"\n')
     monkeypatch.chdir(tmp_path)
-    assert load_config().sample == 3
+    assert load_config().input == Path("data")
 
 
 def test_no_config_file_gives_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,14 +68,14 @@ def test_invalid_options_fail_loudly(options: dict, message: str) -> None:
 
 def test_unknown_top_level_key(tmp_path: Path) -> None:
     config_file = tmp_path / "extraceval.toml"
-    config_file.write_text("smaple = 3\n")
-    with pytest.raises(ConfigError, match="smaple"):
+    config_file.write_text('inptu = "data"\n')
+    with pytest.raises(ConfigError, match="inptu"):
         load_config(config_file)
 
 
 def test_override_ignores_none_and_validates() -> None:
-    config = Config(sample=5).override(sample=None, input="other", seed=3)
-    assert (config.sample, config.input, config.seed) == (5, Path("other"), 3)
+    config = Config(extractors=["pypdf"]).override(extractors=None, input="other")
+    assert (config.extractors, config.input) == (["pypdf"], Path("other"))
 
 
 def test_pymupdf4llm_text_requires_layout() -> None:

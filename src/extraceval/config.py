@@ -3,8 +3,7 @@
 Example::
 
     input = "pdfs"
-    sample = 20
-    extractors = ["pypdfium2", "pymupdf", "pdfplumber-layout"]  # omit to run all installed
+    extractors = ["pypdfium2", "pymupdf", "pdfplumber-layout"]  # omit to run all
 
     [options.pymupdf]
     sort = true
@@ -19,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from extraceval import extractors
 from extraceval.extractors import Extractor, ExtractorOptions
@@ -54,11 +53,10 @@ class Config(BaseModel):
     """A PDF file or a directory searched recursively for PDFs."""
     output: Path = Path("runs")
     """Directory in which each run gets its own subdirectory."""
-    sample: int | None = Field(default=None, gt=0)
-    """Number of documents to draw at random; ``None`` uses all of them."""
-    seed: int = 0
+    gold: Path = Path("gold")
+    """Gold texts, as ``<gold>/<PDF file stem>/<label>.txt``."""
     extractors: list[str] | None = None
-    """Extractors to run, by name; ``None`` runs every installed tool and every defined variant."""
+    """Extractors to run, by name; ``None`` runs every built-in tool and every defined variant."""
     options: dict[str, dict[str, Any]] = {}
     """Settings per extractor name. A ``tool`` key makes the entry a variant of that tool."""
 
@@ -68,12 +66,10 @@ class Config(BaseModel):
         return Config.model_validate(self.model_dump() | updates)
 
     def resolve_extractors(self) -> list[ExtractorSpec]:
-        """Turn names and options into validated specs. Uninstalled tools are included."""
-        if self.extractors is not None:
-            names = self.extractors
-        else:
-            installed = [name for name, cls in extractors.registry().items() if cls.is_available()]
-            names = list(dict.fromkeys([*installed, *self.options]))
+        """Turn names and options into validated specs."""
+        names = self.extractors
+        if names is None:
+            names = list(dict.fromkeys([*extractors.EXTRACTORS, *self.options]))
         return [self._spec(name) for name in names]
 
     def _spec(self, name: str) -> ExtractorSpec:
@@ -109,7 +105,8 @@ def load_config(path: Path | str | None = None) -> Config:
     except ValidationError as exc:
         raise ConfigError(f"invalid config in {path}:\n{exc}") from None
     base = path.parent
-    return config.model_copy(update={"input": base / config.input, "output": base / config.output})
+    paths = {key: base / getattr(config, key) for key in ("input", "output", "gold")}
+    return config.model_copy(update=paths)
 
 
 def _read_table(path: Path) -> dict[str, Any] | None:

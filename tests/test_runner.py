@@ -1,10 +1,13 @@
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-import extraceval
-from extraceval import Config, Extractor, ExtractorOptions, Runner, register
+from extraceval import extractors
+from extraceval.config import Config
+from extraceval.extractors import Extractor, ExtractorOptions
+from extraceval.runner import Runner
 from extraceval.storage import RunDirectory
 
 
@@ -12,7 +15,6 @@ class FakeOptions(ExtractorOptions):
     fail_on: str | None = None
 
 
-@register("fake")
 class Fake(Extractor[FakeOptions]):
     distribution = "pytest"
     calls = 0
@@ -28,25 +30,19 @@ class Fake(Extractor[FakeOptions]):
         return [f"{path.stem} page 1", f"{path.stem} page 2"]
 
 
-@register("fake-broken-setup")
 class BrokenSetup(Fake):
     def setup(self) -> None:
         raise RuntimeError("no model")
 
 
-@register("fake-broken-warm-up")
 class BrokenWarmUp(Fake):
     def warm_up(self) -> None:
         raise RuntimeError("cannot read the warm-up page")
 
 
-@register("fake-missing")
-class Missing(Fake):
-    distribution = "surely-not-installed-xyz"
-
-
 @pytest.fixture(autouse=True)
-def reset_calls() -> None:
+def fakes(register: Callable[..., None]) -> None:
+    register(fake=Fake, **{"fake-broken-setup": BrokenSetup, "fake-broken-warm-up": BrokenWarmUp})
     Fake.calls = Fake.warm_ups = 0
 
 
@@ -55,23 +51,23 @@ def make_config(pdf_dir: Path, tmp_path: Path, **kwargs: object) -> Config:
 
 
 def test_run_writes_outputs_results_and_manifest(pdf_dir: Path, tmp_path: Path) -> None:
-    config = make_config(pdf_dir, tmp_path, sample=3, extractors=["fake", "pypdfium2"])
+    config = make_config(pdf_dir, tmp_path, extractors=["fake", "pypdfium2"])
     result = Runner(config, name="test").run()
 
     assert result.path == tmp_path / "runs" / "test"
-    assert len(result.results) == 6
+    assert len(result.results) == 10
     assert all(r.status == "ok" and r.pages == 2 for r in result.results)
 
     run_dir = RunDirectory(result.path)
     doc_id = result.results[0].document
-    assert (run_dir.sample_dir / f"{doc_id}.pdf").exists()
+    assert (run_dir.pdf_dir / f"{doc_id}.pdf").exists()
     assert run_dir.read_output("fake", doc_id) == [f"{doc_id} page 1", f"{doc_id} page 2"]
-    assert len(run_dir.read_results()) == 6
+    assert len(run_dir.read_results()) == 10
 
     manifest = json.loads(run_dir.manifest_path.read_text())
     assert set(manifest["extractors"]) == {"fake", "pypdfium2"}
     assert manifest["extractors"]["fake"]["setup_seconds"] is not None
-    assert len(manifest["documents"]) == 3
+    assert len(manifest["documents"]) == 5
 
 
 def test_errors_are_recorded_and_do_not_stop_the_run(pdf_dir: Path, tmp_path: Path) -> None:
@@ -115,20 +111,6 @@ def test_resume_with_other_extractors_keeps_manifest_entries(pdf_dir: Path, tmp_
     assert manifest["extractors"]["fake"]["setup_seconds"] is not None
 
 
-def test_uninstalled_extractors_are_skipped(pdf_dir: Path, tmp_path: Path) -> None:
-    runner = Runner(make_config(pdf_dir, tmp_path, extractors=["fake", "fake-missing"]))
-    assert [s.name for s in runner.extractors] == ["fake"]
-    assert [s.name for s in runner.skipped] == ["fake-missing"]
-
-
-def test_run_function_with_overrides(pdf_dir: Path, tmp_path: Path) -> None:
-    result = extraceval.run(
-        pdf_dir, extractors=["fake"], sample=2, output=tmp_path / "out", name="api"
-    )
-    assert result.path == tmp_path / "out" / "api"
-    assert len(result.results) == 2
-
-
 def test_warm_up_runs_once_before_timing(pdf_dir: Path, tmp_path: Path) -> None:
     Runner(make_config(pdf_dir, tmp_path, extractors=["fake"])).run()
     assert (Fake.warm_ups, Fake.calls) == (1, 5)
@@ -140,5 +122,5 @@ def test_failed_warm_up_does_not_stop_extraction(pdf_dir: Path, tmp_path: Path) 
 
 
 def test_builtin_warm_up_reads_bundled_pdf() -> None:
-    extractor = extraceval.extractors.get("pypdfium2")()
+    extractor = extractors.get("pypdfium2")()
     extractor.warm_up()  # raises if the asset is missing from the package

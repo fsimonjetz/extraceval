@@ -3,12 +3,13 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from extraceval import Config, Runner, compare
 from extraceval.cli import app
-from extraceval.compare import Metric, similarity_matrix
+from extraceval.compare import Metric, compare, similarity_matrix
 from extraceval.compare.diff import Segment, diff_document, diff_page, normalize
 from extraceval.compare.matrix import PDFIUM_HYPHEN, SOFT_HYPHEN, words
+from extraceval.config import Config
 from extraceval.models import ExtractionResult
+from extraceval.runner import Runner
 from extraceval.storage import RunDirectory
 
 

@@ -42,9 +42,6 @@ def initialize(
             on_start(spec)
         result = InitResult(spec.name)
         results.append(result)
-        if not spec.cls.is_available():
-            result.error = f"{spec.cls.distribution} is not installed"
-            continue
         start = time.perf_counter()
         try:
             extractor = spec.build()

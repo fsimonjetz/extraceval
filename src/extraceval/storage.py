@@ -2,7 +2,7 @@
 
 <run>/
   manifest.json                    resolved config, tool versions, environment, documents
-  sample/<document>.pdf            copies of the sampled inputs
+  pdfs/<document>.pdf              copies of the input PDFs
   outputs/<extractor>/<document>.txt   extracted text, pages separated by form feeds
   results.jsonl                    one ExtractionResult per (document, extractor)
   tools.log                        what the tools printed or logged, by tool and document
@@ -26,13 +26,13 @@ class RunDirectory:
         self.manifest_path = path / "manifest.json"
         self.results_path = path / "results.jsonl"
         self.log_path = path / "tools.log"
-        self.sample_dir = path / "sample"
+        self.pdf_dir = path / "pdfs"
         self.outputs_dir = path / "outputs"
 
     def add_document(self, document: Document) -> Document:
         """Copy a document into the run and return it pointing at the copy."""
-        self.sample_dir.mkdir(parents=True, exist_ok=True)
-        target = self.sample_dir / f"{document.id}.pdf"
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        target = self.pdf_dir / f"{document.id}.pdf"
         if not target.exists():
             shutil.copy2(document.path, target)
         return Document(id=document.id, path=target)

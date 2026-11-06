@@ -1,4 +1,4 @@
-"""Runs every configured extractor over the sampled documents and stores the outputs."""
+"""Runs every configured extractor over the input documents and stores the outputs."""
 
 import logging
 import platform
@@ -12,7 +12,7 @@ from typing import Any
 
 from extraceval import corpus
 from extraceval.capture import capture
-from extraceval.config import Config, ExtractorSpec, load_config
+from extraceval.config import Config, ExtractorSpec
 from extraceval.extractors import Extractor
 from extraceval.models import Document, ExtractionResult
 from extraceval.storage import RunDirectory
@@ -29,7 +29,7 @@ class RunResult:
 
 
 class Runner:
-    """Prepares a run (sample, extractors, run directory) on creation; ``run`` executes it.
+    """Prepares a run (documents, extractors, run directory) on creation; ``run`` executes it.
 
     Re-using a run name resumes it: pairs that already succeeded are skipped unless ``force``.
     """
@@ -40,13 +40,8 @@ class Runner:
         self.created = datetime.now().astimezone()
         self.name = name or self.created.strftime("%Y%m%d-%H%M%S")
         self.directory = RunDirectory(config.output / self.name)
-        self.documents = corpus.load(config.input, config.sample, config.seed)
-
-        specs = config.resolve_extractors()
-        self.extractors = [spec for spec in specs if spec.cls.is_available()]
-        self.skipped = [spec for spec in specs if spec not in self.extractors]
-        for spec in self.skipped:
-            log.warning("skipping %r: %s is not installed", spec.name, spec.cls.distribution)
+        self.documents = corpus.load(config.input)
+        self.extractors = config.resolve_extractors()
 
     @property
     def total(self) -> int:
@@ -163,33 +158,8 @@ class Runner:
             "platform": platform.platform(),
             "config": self.config.model_dump(mode="json"),
             "extractors": earlier | current,
-            "skipped": [spec.name for spec in self.skipped],
             "documents": [{"id": d.id, "source": str(d.path)} for d in self.documents],
         }
-
-
-def run(
-    input: Path | str | None = None,
-    *,
-    config: Config | Path | str | None = None,
-    sample: int | None = None,
-    seed: int | None = None,
-    extractors: list[str] | None = None,
-    output: Path | str | None = None,
-    name: str | None = None,
-    force: bool = False,
-) -> RunResult:
-    """Run the extractors over a sample of PDFs and save their outputs.
-
-    ``config`` is a ``Config``, a path to a config file, or ``None`` to use ``extraceval.toml`` /
-    ``pyproject.toml`` in the working directory if present. Keyword arguments override it.
-    """
-    if not isinstance(config, Config):
-        config = load_config(config)
-    config = config.override(
-        input=input, sample=sample, seed=seed, extractors=extractors, output=output
-    )
-    return Runner(config, name=name, force=force).run()
 
 
 def _error(doc: Document, spec: ExtractorSpec, seconds: float, message: str) -> ExtractionResult:

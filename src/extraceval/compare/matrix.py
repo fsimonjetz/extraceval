@@ -119,7 +119,7 @@ def similarity_matrix(
                     total[a, b] += len(left) + len(right)
                 else:
                     size = NGRAM_SIZE if metric == Metric.NGRAMS else 1
-                    ours, theirs = _ngrams(left, size), _ngrams(right, size)
+                    ours, theirs = ngrams(left, size), ngrams(right, size)
                     matched[a, b] += sum((ours & theirs).values())
                     total[a, b] += theirs.total()
 
@@ -127,7 +127,7 @@ def similarity_matrix(
     return SimilarityMatrix(list(names), metric, scores)
 
 
-def _ngrams(words: list[str], size: int) -> Counter[tuple[str, ...]]:
+def ngrams(words: list[str], size: int) -> Counter[tuple[str, ...]]:
     return Counter(zip(*(words[i:] for i in range(size)), strict=False))
 
 

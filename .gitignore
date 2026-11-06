@@ -11,3 +11,9 @@ wheels/
 
 # ExtracEval run outputs
 runs/
+
+# MacOS meta files
+.DS_Store
+
+# Gold texts from wiso-net (licensed, not for publication)
+gold/
