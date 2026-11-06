@@ -48,6 +48,18 @@ def test_article_is_located_across_pages_and_scored(run_dir: RunDirectory, gold:
     assert jumbled.ngrams < 0.6
 
 
+def test_pages_repeating_an_article_are_not_located(tmp_path: Path) -> None:
+    """Like a front-page teaser whose sentences reappear in the full article further on."""
+    directory = RunDirectory(tmp_path / "run")
+    directory.write_manifest({"documents": [{"id": "e-1", "source": "/data/E.pdf"}]})
+    directory.write_output("tool", "e-1", [f"{ARTICLE} {CONTINUED}", OTHER, f"{OTHER} {ARTICLE}"])
+    (tmp_path / "gold" / "E").mkdir(parents=True)
+    (tmp_path / "gold" / "E" / "1.txt").write_text(f"{ARTICLE} {CONTINUED}")
+
+    (result,) = score(directory.path, tmp_path / "gold").articles
+    assert result.pages == [1]
+
+
 def test_misplaced_and_missing_articles(run_dir: RunDirectory, gold: Path) -> None:
     (gold / "Edition_2026_01" / "2.txt").rename(gold / "Edition_2026_01" / "10b.txt")
     (gold / "Edition_2026_01" / "e1.txt").write_text("Ganz andere Worte stehen in diesem Text.")
