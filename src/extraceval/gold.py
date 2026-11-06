@@ -6,10 +6,11 @@ only recall is measured: how much of each article an extractor recovers, as word
 there at all?) and as 3-word sequences (are the sentences intact?). Case is ignored, as print
 headlines are often in capitals where the press database has them in mixed case.
 
-Each article is located once for all extractors: on the pages where their outputs contain, on
-average, at least ``LOCATE_THRESHOLD`` of the article's 3-word sequences. Every extractor is then
-scored on those pages, so a weak extractor cannot shift the window in its favour, and an article
-continued on later pages is found in full.
+Each article is located once for all extractors: on the page where their outputs contain most of
+the article's 3-word sequences, plus every further page that adds, on average, at least
+``LOCATE_THRESHOLD`` of them. So an article continued on later pages is found in full, while a
+page that only repeats some of it, such as the full article behind a front-page teaser, is not.
+Every extractor is scored on the same pages, so a weak one cannot shift the window in its favour.
 """
 
 import re
@@ -141,19 +142,37 @@ def _score_article(article: Article, pages: dict[str, list[list[str]]]) -> Artic
 
 
 def _locate(gold: Counter[tuple[str, ...]], pages: dict[str, list[list[str]]]) -> list[int]:
-    """Pages on which the extractors find, on average, a clear share of the article."""
+    """Pages that each add, on average over the extractors, a clear share of the article.
+
+    Pages are added greedily, the one adding the most first, until none adds enough.
+    """
     if not gold or not pages:
         return []
-    count = max(len(tool_pages) for tool_pages in pages.values())
-    located = []
-    for index in range(count):
-        recalls = [
-            _recall(gold, ngrams(tool_pages[index], NGRAM_SIZE)) if index < len(tool_pages) else 0
-            for tool_pages in pages.values()
-        ]
-        if sum(recalls) / len(recalls) >= LOCATE_THRESHOLD:
-            located.append(index + 1)
-    return located
+    found = [
+        [gold & ngrams(page, NGRAM_SIZE) for page in tool_pages] for tool_pages in pages.values()
+    ]
+    covered: list[Counter[tuple[str, ...]]] = [Counter() for _ in found]
+    located: list[int] = []
+    candidates = set(range(max(len(tool_pages) for tool_pages in found)))
+    while candidates:
+        gains = {
+            index: sum(
+                ((covered[t] | tool_pages[index]) - covered[t]).total()
+                for t, tool_pages in enumerate(found)
+                if index < len(tool_pages)
+            )
+            / (len(found) * gold.total())
+            for index in candidates
+        }
+        best = max(gains, key=lambda index: gains[index])
+        if gains[best] < LOCATE_THRESHOLD:
+            break
+        located.append(best + 1)
+        candidates.remove(best)
+        for t, tool_pages in enumerate(found):
+            if best < len(tool_pages):
+                covered[t] |= tool_pages[best]
+    return sorted(located)
 
 
 def _recall[T](gold: Counter[T], found: Counter[T]) -> float:
