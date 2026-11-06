@@ -114,9 +114,11 @@ and also ignoring case. Each article counts equally, regardless of its length.
 
 Each article is looked for on all pages, as articles are often continued on later pages and the
 start page may not be exact (e.g. when an article opens with a full-page photo). It is located
-on the pages on which the tools' outputs contain, on average, at least 5% of its 3-word
-sequences, and every tool is scored on these same pages. `score` notes articles found on other
-pages than the file name says, and articles that are not found at all and therefore not scored.
+on the page on which the tools' outputs contain most of its 3-word sequences, plus every further
+page that adds, on average, at least 5% of them. Pages that only repeat part of an article, such
+as the full article behind a front-page teaser, are thus left out. Every tool is scored on the
+same pages. `score` notes articles found on other pages than the file name says, and articles
+that are not found at all and therefore not scored.
 
 The gold directory defaults to `gold` in the working directory; change it with `gold` in the
 configuration or `--gold`.
