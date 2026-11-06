@@ -49,13 +49,13 @@ def test_article_is_located_across_pages_and_scored(run_dir: RunDirectory, gold:
 
 
 def test_misplaced_and_missing_articles(run_dir: RunDirectory, gold: Path) -> None:
-    (gold / "Edition_2026_01" / "2.txt").rename(gold / "Edition_2026_01" / "5.txt")
+    (gold / "Edition_2026_01" / "2.txt").rename(gold / "Edition_2026_01" / "10b.txt")
     (gold / "Edition_2026_01" / "e1.txt").write_text("Ganz andere Worte stehen in diesem Text.")
     (gold / "Unknown_Edition").mkdir()
 
     report = score(run_dir.path, gold)
     misplaced, missing = report.articles
-    assert misplaced.misplaced
+    assert (misplaced.article.page, misplaced.misplaced) == (10, True)
     assert (missing.article.label, missing.article.page, missing.pages) == ("e1", None, [])
     assert report.found == [misplaced]
     assert report.unmatched == ["Unknown_Edition"]
@@ -76,7 +76,7 @@ def test_score_command(run_dir: RunDirectory, gold: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "1 good" in result.output
-    assert "Edition_2026_01/2" in result.output
+    assert "Edition_2026_01" in result.output
 
     missing = CliRunner().invoke(app, ["score", str(run_dir.path), "--gold", "nope"])
     assert missing.exit_code == 1

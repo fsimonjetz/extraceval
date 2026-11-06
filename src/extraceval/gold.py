@@ -12,6 +12,7 @@ scored on those pages, so a weak extractor cannot shift the window in its favour
 continued on later pages is found in full.
 """
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from extraceval.compare.matrix import NGRAM_SIZE, ngrams, words
 from extraceval.storage import RunDirectory
 
 LOCATE_THRESHOLD = 0.05
+LEADING_NUMBER = re.compile(r"\d+")
 
 
 @dataclass(frozen=True)
@@ -37,8 +39,8 @@ class Article:
 
     @property
     def page(self) -> int | None:
-        """The page the label names, if it is a number."""
-        return int(self.label) if self.label.isdigit() else None
+        """The page the label starts with, e.g. 8 for ``8`` and ``8b``, if any."""
+        return _leading_number(self.label)
 
 
 @dataclass(frozen=True)
@@ -159,9 +161,15 @@ def _recall[T](gold: Counter[T], found: Counter[T]) -> float:
     return (gold & found).total() / gold.total() if gold else 0.0
 
 
+def _leading_number(label: str) -> int | None:
+    match = LEADING_NUMBER.match(label)
+    return int(match.group()) if match else None
+
+
 def _label_order(path: Path) -> tuple[bool, int, str]:
-    """Numbered pages first, in numeric order, then other labels such as ``e2``."""
-    return (not path.stem.isdigit(), int(path.stem) if path.stem.isdigit() else 0, path.stem)
+    """Labels starting with a page number first, in page order, then others such as ``e2``."""
+    page = _leading_number(path.stem)
+    return (page is None, page or 0, path.stem)
 
 
 def page_ranges(pages: Iterable[int]) -> str:

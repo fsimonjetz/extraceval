@@ -224,8 +224,8 @@ def score_outputs(
     except (ConfigError, FileNotFoundError, ValueError) as exc:
         _fail(str(exc))
 
-    for folder in report.unmatched:
-        console.print(f"[yellow]No document named {folder!r} in the run; skipping its gold.[/]")
+    if report.unmatched:
+        console.print(f"[dim]Gold for documents not in this run: {', '.join(report.unmatched)}[/]")
     if not report.found:
         _fail(f"none of the gold articles in {gold_dir} were found in the run")
 
@@ -237,7 +237,9 @@ def score_outputs(
 
     for result in report.articles:
         name = result.article.name
-        if not result.pages:
+        if not result.article.words:
+            console.print(f"[yellow]{name} is empty; it is not scored.[/]")
+        elif not result.pages:
             console.print(f"[yellow]{name} was not found in any output; it is not scored.[/]")
         elif result.misplaced:
             pages = "page" if len(result.pages) == 1 else "pages"
@@ -329,8 +331,15 @@ def _gold_table(report: GoldReport, ranked: list[str], speed: dict[str, float | 
 
 
 def _articles_table(report: GoldReport, ranked: list[str]) -> Table:
-    """Share of each article's 3-word sequences per extractor, numbered as in the main table."""
-    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title="3-word sequences per article")
+    """Share of each article's 3-word sequences per extractor, numbered as in the main table.
+
+    Articles are shown by label alone if they all come from the same document.
+    """
+    editions = {r.article.name.rpartition("/")[0] for r in report.found}
+    title = "3-word sequences per article"
+    if len(editions) == 1:
+        title += f" of {editions.pop()}"
+    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, title=title)
     table.add_column("article", no_wrap=True)
     table.add_column("pages", no_wrap=True)
     for number in range(1, len(ranked) + 1):
@@ -338,7 +347,8 @@ def _articles_table(report: GoldReport, ranked: list[str]) -> Table:
     for result in report.found:
         scores = [result.scores.get(name) for name in ranked]
         cells = [_recall_cell(s.ngrams if s else None) for s in scores]
-        table.add_row(result.article.name, page_ranges(result.pages), *cells)
+        label = result.article.label if len(editions) <= 1 else result.article.name
+        table.add_row(label, page_ranges(result.pages), *cells)
     return table
 
 
