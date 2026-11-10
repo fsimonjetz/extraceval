@@ -12,8 +12,16 @@ without it (see [Offline use](#offline-use)).
 ## Installation
 
 ```bash
-pip install extraceval
+pip install git+https://github.com/fsimonjetz/extraceval
 ```
+
+or, to install it as a standalone command with uv:
+
+```bash
+uv tool install git+https://github.com/fsimonjetz/extraceval
+```
+
+For development, clone the repository and run `uv sync`.
 
 This installs pypdfium2, pypdf, PyMuPDF, pymupdf4llm, pdfplumber, pdfminer.six and Docling.
 Docling pulls in PyTorch and downloads its models on first use. Note that PyMuPDF and pymupdf4llm
